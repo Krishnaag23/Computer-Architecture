@@ -22,6 +22,8 @@ using std::string;
 UINT64 insCount    = 0; //number of dynamically executed instructions
 UINT64 bblCount    = 0; //number of dynamically executed basic blocks
 UINT64 threadCount = 0; //total number of threads, including main thread
+UINT64 fastForwardCount = 0; //total number of instructions  in billion, to skip
+UINT64 icount = 0;
 
 std::ostream* out = &cerr;
 
@@ -29,7 +31,7 @@ std::ostream* out = &cerr;
 // Command line switches
 /* ===================================================================== */
 KNOB< string > KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool", "o", "", "specify file name for MyPinTool output");
-
+KNOB< UINT64 > KnobFastForward(KNOB_MODE_WRITEONCE, "pintool", "f", "", "specify fast forward amount in billions");
 KNOB< BOOL > KnobCount(KNOB_MODE_WRITEONCE, "pintool", "count", "1",
                        "count instructions, basic blocks and threads in the application");
 
@@ -67,6 +69,38 @@ VOID CountBbl(UINT32 numInstInBbl)
     insCount += numInstInBbl;
 }
 
+/*!
+ * Increase counter for the number of instructions.
+ * */
+VOID InsCount(){
+icount++;
+}
+
+ADDRINT Terminate(void)
+{
+        return (icount >= fastForwardCount + 1,000,000,000);
+}
+
+// Analysis routine to check fast-forward condition
+ADDRINT FastForward(void) {
+	return (icount >= fastForwardCount && icount);
+}
+
+// Analysis routine to exit the application
+void MyExitRoutine(...) {
+	// Do an exit system call to exit the application.
+	// As we are calling the exit system call PIN would not be able to instrument application end.
+	// Because of this, even if you are instrumenting the application end, the Fini function would not
+	// be called. Thus you should report the statistics here, before doing the exit system call.
+
+	// Results etc
+	exit(0);
+}
+
+// Predicated analysis routine
+void MyPredicatedAnalysis(...) {
+	// analysis code
+}
 /* ===================================================================== */
 // Instrumentation callbacks
 /* ===================================================================== */
@@ -118,6 +152,17 @@ VOID Fini(INT32 code, VOID* v)
     *out << "===============================================" << endl;
 }
 
+INS_InsertIfCall(ins, IPOINT_BEFORE, Terminate, IARG_END);
+INS_InsertThenCall(ins, IPOINT_BEFORE, MyExitRoutine, ..., IARG_END);
+
+INS_InsertIfCall(ins, IPOINT_BEFORE, FastForward, IARG_END);
+INS_InsertThenPredicatedCall(ins, IPOINT_BEFORE, MyPredicatedAnalysis, ..., IARG_END); // for instructions with true predicates
+
+INS_InsertIfCall(ins, IPOINT_BEFORE, FastForward, IARG_END);
+INS_InsertThenCall(ins, IPOINT_BEFORE, MyAnalysis, ..., IARG_END);  // for all instructions
+
+INS_InsertCall(ins, IPOINT_BEFORE, InsCount, IARG_END);
+
 /*!
  * The main procedure of the tool.
  * This function is called when the application image is loaded but not yet started.
@@ -135,6 +180,7 @@ int main(int argc, char* argv[])
     }
 
     string fileName = KnobOutputFile.Value();
+    fastForwardCount = KnobFastForward.Value() * 1,000,000,000;
 
     if (!fileName.empty())
     {
@@ -147,7 +193,7 @@ int main(int argc, char* argv[])
         TRACE_AddInstrumentFunction(Trace, 0);
 
         // Register function to be called for every thread before it starts running
-        PIN_AddThreadStartFunction(ThreadStart, 0);
+	PIN_AddThreadStartFunction(ThreadStart, 0);
 
         // Register function to be called when the application exits
         PIN_AddFiniFunction(Fini, 0);
