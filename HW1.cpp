@@ -320,15 +320,6 @@ VOID Trace(TRACE trace, VOID* v)
                 	}
             	}
 	}
-	INS_InsertIfCall(ins, IPOINT_BEFORE, FastForward, IARG_END);
-	INS_InsertThenPredicatedCall(ins, IPOINT_BEFORE, MyPredicatedAnalysis, ..., IARG_END); // for instructions with true predicates
-
-	INS_InsertIfCall(ins, IPOINT_BEFORE, FastForward, IARG_END);
-	INS_InsertThenCall(ins, IPOINT_BEFORE, MyAnalysis, ..., IARG_END);  // for all instructions
-
-	INS_InsertCall(ins, IPOINT_BEFORE, InsCount, IARG_END);
-
-
     }
 }
 
@@ -354,10 +345,7 @@ VOID ThreadStart(THREADID threadIndex, CONTEXT* ctxt, INT32 flags, VOID* v) { th
 VOID Fini(INT32 code, VOID* v)
 {
     *out << "===============================================" << endl;
-    *out << "MyPinTool analysis results: " << endl;
-    *out << "Number of instructions: " << insCount << endl;
-    *out << "Number of basic blocks: " << bblCount << endl;
-    *out << "Number of threads: " << threadCount << endl;
+    MyExitRoutine();
     *out << "===============================================" << endl;
 }
 
@@ -391,7 +379,7 @@ int main(int argc, char* argv[])
         TRACE_AddInstrumentFunction(Trace, 0);
 
         // Register function to be called for every thread before it starts running
-	PIN_AddThreadStartFunction(ThreadStart, 0);
+	//PIN_AddThreadStartFunction(ThreadStart, 0);
 
         // Register function to be called when the application exits
         PIN_AddFiniFunction(Fini, 0);
