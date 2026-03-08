@@ -16,6 +16,10 @@
 using std::cerr;
 using std::endl;
 using std::string;
+using std::set;
+using std::map;
+using std::max;
+using std::min;
 
 /* ================================================================== */
 // Global variables
@@ -184,7 +188,7 @@ icount++;
 
 ADDRINT Terminate(void)
 {
-        return (icount >= fastForwardCount + 1,000,000,000);
+        return (icount >= fastForwardCount + 1e9);
 }
 
 // Analysis routine to check fast-forward condition
@@ -214,10 +218,10 @@ void MyExitRoutine(){
 	*out << "Part C Analysis Results: " << endl;
 	*out << "------------------------------------------------------------" << endl;
 
-	*out << "Instruction Footprint Blocks     			= " << instrAddr.size() << endl;
-    	*out << "Instruction Footprint (in bytes) 			= " << 32*instrAddr.size() << endl;
-    	*out << "Data Footprint Blocks            			= " << dataAddr.size() << endl;
-    	*out << "Data Footprint (in bytes)        			= " << 32*dataAddr.size() << endl;
+	*out << "Instruction Footprint Blocks     			= " << instructionAddress.size() << endl;
+    	*out << "Instruction Footprint (in bytes) 			= " << 32*instructionAddress.size() << endl;
+    	*out << "Data Footprint Blocks            			= " << dataAddress.size() << endl;
+    	*out << "Data Footprint (in bytes)        			= " << 32*dataAddress.size() << endl;
 	*out << "Number of Single Memory Chunk Instruction access 	=" << singleChunkIns << endl;
 	*out << "Number of Multiple Memory Chunk Instruction access 	=" << multipleChunkIns << endl;
 	*out << "Number of Single Memory Chunk data access 		=" << singleChunkData << endl;
@@ -234,7 +238,7 @@ void MyExitRoutine(){
 	*out << "Memory Instruction Read Operand(with 1 memory read operand)				" << memReadOp[1] << endl;
 	*out << "Memory Instruction write Operand(with 2 memory write operand)				" << memWriteOp[2] << endl;
 	*out << "Maximum number of bytes touched by an instruction : " << maxMemBytes << endl;
-	*out << "Average number of bytes touched by an instruction : " << fixed << setprecision(6) << avgMemBytes << endl;
+	*out << "Average number of bytes touched by an instruction : " << std::fixed << std::setprecision(6) << avgMemBytes << endl;
 	*out << "Maximum value of immediate : " << maxImm << endl;
 	*out << "Minimum value of immediate : " << minImm << endl;
 	*out << "Maximum value of displacement used in memory addressing : " << maxDisp << endl;
@@ -260,8 +264,8 @@ VOID Trace(TRACE trace, VOID* v)
     for (BBL bbl = TRACE_BblHead(trace); BBL_Valid(bbl); bbl = BBL_Next(bbl))
     {
         // Insert a call to CountBbl() before every basic bloc, passing the number of instructions
-	BBL_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR)Terminate, IARG_END);
-	BBL_InsertThenCall(ins, IPOINT_BEFORE, (AFUNPTR)MyExitRoutine, IARG_END);
+	BBL_InsertIfCall(bbl, IPOINT_BEFORE, (AFUNPTR)Terminate, IARG_END);
+	BBL_InsertThenCall(bbl, IPOINT_BEFORE, (AFUNPTR)MyExitRoutine, IARG_END);
 
         BBL_InsertCall(bbl, IPOINT_BEFORE, (AFUNPTR)CountBbl, IARG_UINT32, BBL_NumIns(bbl), IARG_END);
 	for(INS ins=BBL_InsHead(bbl); INS_Valid(ins); ins = INS_Next(ins)){
@@ -277,9 +281,7 @@ VOID Trace(TRACE trace, VOID* v)
 
 		UINT32 memOperands = INS_MemoryOperandCount(ins);
 		UINT32 numRead = 0, numWrite = 0;
-		UINT32 totalMemSize = 0;INT32 opCount = INS_OperandCount(ins);
-		UINT32 insReadReg = INS_MaxNumRRegs(ins);
-		UINT32 insWriteReg = INS_MaxNumWRegs(ins);
+		UINT32 totalMemSize = 0;
 
 		INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR)FastForward, IARG_END);
 		INS_InsertThenCall(ins, IPOINT_BEFORE, (AFUNPTR)ins_footprint, IARG_UINT32, startAddr, IARG_UINT32, endAddr, IARG_END);
@@ -366,7 +368,7 @@ int main(int argc, char* argv[])
     }
 
     string fileName = KnobOutputFile.Value();
-    fastForwardCount = KnobFastForward.Value() * 1,000,000,000;
+    fastForwardCount = KnobFastForward.Value() * 1e9;
 
     if (!fileName.empty())
     {
