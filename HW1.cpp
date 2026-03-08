@@ -177,13 +177,21 @@ VOID Trace(TRACE trace, VOID* v)
 
         BBL_InsertCall(bbl, IPOINT_BEFORE, (AFUNPTR)CountBbl, IARG_UINT32, BBL_NumIns(bbl), IARG_END);
 	for(INS ins=BBL_InsHead(bbl); INS_Valid(ins); ins = INS_Next(ins)){
-            UINT32 startAddr, endAddr;
-            UINT32 insAddr = INS_Address(ins);
-            UINT32 insSize = INS_Size(ins);
-            startAddr = (insAddr/32)*32;
-            endAddr = ((insAddr + insSize)/32)*32;
-            INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR)FastForward, IARG_END);
-            INS_InsertThenCall(ins, IPOINT_BEFORE, (AFUNPTR)ins_footprint, IARG_UINT32, startAddr, IARG_UINT32, endAddr, IARG_END);
+		UINT32 startAddr, endAddr;
+		UINT32 insAddr = INS_Address(ins);
+		UINT32 insSize = INS_Size(ins);
+		startAddr = (insAddr/32)*32;
+		endAddr = ((insAddr + insSize)/32)*32;
+		INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR)FastForward, IARG_END);
+		INS_InsertThenCall(ins, IPOINT_BEFORE, (AFUNPTR)ins_footprint, IARG_UINT32, startAddr, IARG_UINT32, endAddr, IARG_END);
+
+		UINT32 memOperands = INS_MemoryOperandCount(ins);
+		 for (UINT32 memOper = 0; memOper < memOperands; memOper++){
+			UINT32 memSize = INS_MemoryOperandSize(ins, memOper);
+			INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR)FastForward, IARG_END);
+                INS_InsertThenPredicatedCall(ins, IPOINT_BEFORE, (AFUNPTR)data_footprint, IARG_MEMORYOP_EA, memOper, IARG_UINT32, memSize, IARG_END);
+                totalMemSize += memSize;
+		 }
 	}
 	INS_InsertIfCall(ins, IPOINT_BEFORE, FastForward, IARG_END);
 	INS_InsertThenPredicatedCall(ins, IPOINT_BEFORE, MyPredicatedAnalysis, ..., IARG_END); // for instructions with true predicates
