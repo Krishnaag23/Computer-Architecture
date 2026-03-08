@@ -27,6 +27,7 @@ UINT64 threadCount = 0; //total number of threads, including main thread
 UINT64 fastForwardCount = 0; //total number of instructions  in billion, to skip
 UINT64 icount = 0;
 
+// Variables related to Part C 
 UINT64 singleChunkIns = 0;
 UINT64 multipleChunkIns = 0;
 UINT64 singleChunkData = 0;
@@ -36,6 +37,21 @@ set<UINT32> instructionAddress;
 set<UINT32> dataAddress;
 map<UINT32, UINT64> instructionSize; 
 map<UINT32, UINT64> dataReadSize;
+
+// Part D 
+map<UINT32, UINT64> insLength; 
+map<UINT32, UINT64> insOp; 
+map<UINT32, UINT64> readReg; 
+map<UINT32, UINT64> writeReg;
+map<UINT32, UINT64> memOp;
+map<UINT32, UINT64> memReadOp;
+map<UINT32, UINT64> memWriteOp;
+UINT32 maxMemBytes = 0;
+UINT64 totalMemBytes = 0;
+INT32 maxImm = INT32_MIN;
+INT32 minImm = INT32_MAX;
+INT32 maxDisp = INT32_MIN;
+INT32 minDisp = INT32_MAX;
 
 std::ostream* out = &cerr;
 
@@ -64,6 +80,15 @@ INT32 Usage()
 
     return -1;
 }
+
+void PrintResults(const string &title, const map<UINT32, UINT64> &data) {
+    *out << title << " Results: " << endl;
+    for (const auto &entry : data) {
+        *out << entry.first << " : " << entry.second << endl;
+    }
+    *out << endl;
+}
+
 
 /* ===================================================================== */
 // Analysis routines
@@ -110,6 +135,46 @@ VOID data_footprint(ADDRINT memAddr, UINT32 memSize){
         startAddr += 32;
     }
 }
+
+VOID ins_distribution(
+    UINT32 insSize, 
+    UINT32 opCount, 
+    UINT32 insReadReg, 
+    UINT32 insWriteReg
+){
+    insLength[insSize]++;
+    insOp[opCount]++;
+    readReg[insReadReg]++; 
+    writeReg[insWriteReg]++;
+    
+}
+
+VOID mem_distribution(
+    UINT32 numRead, 
+    UINT32 numWrite,
+    UINT32 totalMemSize
+){
+    memOp[numRead+numWrite]++; 
+    memReadOp[numRead]++; 
+    memWriteOp[numWrite]++;
+    maxMemBytes = max(maxMemBytes, totalMemSize);
+    totalMemBytes += totalMemSize;
+}
+
+VOID imm_distribution(ADDRINT immValue){
+    INT32 imm = (INT32) immValue;
+    maxImm = max(maxImm, imm);
+    minImm = min(minImm, imm);
+}
+
+VOID disp_distribution(ADDRINT dispValue){
+// using Int32 as only analysing 32 bit binaries, so ADDRDELTA 
+// would just be INT_32.
+    INT32 disp = (INT32) dispValue;
+    maxDisp = max(maxDisp, disp);
+    minDisp = min(minDisp, disp);
+}
+
 /*!
  * Increase counter for the number of instructions.
  * */
@@ -135,6 +200,17 @@ void MyExitRoutine(){
 	// be called. Thus you should report the statistics here, before doing the exit system call.
 
 	// Results etc
+
+	UINT64 memInsCount = 0;
+	for(const auto &entry : memOp){
+		if(entry.first > 0) memInsCount += entry.second;
+	}
+	double avgMemBytes = (memInsCount == 0) ? 0.0 : ((1.0*totalMemBytes) / memInsCount);
+
+	// Remove no memory operand instruction from being counted.
+	memReadOp[0] = memReadOp[0]-memOp[0];
+    	memWriteOp[0] = memWriteOp[0]-memOp[0];
+
 	*out << "Part C Analysis Results: " << endl;
 	*out << "------------------------------------------------------------" << endl;
 
@@ -147,13 +223,25 @@ void MyExitRoutine(){
 	*out << "Number of Single Memory Chunk data access 		=" << singleChunkData << endl;
 	*out << "Number of Multiple Memory Chunk data access 		=" << multipleChunkData << endl;
     	*out << "============================================================" << endl;
+
+	*out << "Part D Analysis Results: " << endl;
+	*out << "------------------------------------------------------------" << endl;
+	PrintResults("Distribution of instruction length", insLength);
+	PrintResults("Distribution of the number of operands in an instruction", insOp);
+	*out << "Number of register read operands in an instruction(with 2 register read operands):	" << readReg[2] << endl;
+	*out << "Number of register write operands in an instruction(with 1 register write operand):	" <<  writeReg[1] << endl;
+	*out << "Number of instruction with 3 memory operands:						" <<  memOp[3] << endl;
+	*out << "Memory Instruction Read Operand(with 1 memory read operand)				" << memReadOp[1] << endl;
+	*out << "Memory Instruction write Operand(with 2 memory write operand)				" << memWriteOp[2] << endl;
+	*out << "Maximum number of bytes touched by an instruction : " << maxMemBytes << endl;
+	*out << "Average number of bytes touched by an instruction : " << fixed << setprecision(6) << avgMemBytes << endl;
+	*out << "Maximum value of immediate : " << maxImm << endl;
+	*out << "Minimum value of immediate : " << minImm << endl;
+	*out << "Maximum value of displacement used in memory addressing : " << maxDisp << endl;
+	*out << "Minimum value of displacement used in memory addressing : " << minDisp << endl;
 	exit(0);
 }
 
-// Predicated analysis routine
-void MyPredicatedAnalysis(...) {
-	// analysis code
-}
 /* ===================================================================== */
 // Instrumentation callbacks
 /* ===================================================================== */
@@ -182,16 +270,55 @@ VOID Trace(TRACE trace, VOID* v)
 		UINT32 insSize = INS_Size(ins);
 		startAddr = (insAddr/32)*32;
 		endAddr = ((insAddr + insSize)/32)*32;
+
+		UINT32 opCount = INS_OperandCount(ins);
+		UINT32 insReadReg = INS_MaxNumRRegs(ins);
+		UINT32 insWriteReg = INS_MaxNumWRegs(ins);
+
+		UINT32 memOperands = INS_MemoryOperandCount(ins);
+		UINT32 numRead = 0, numWrite = 0;
+		UINT32 totalMemSize = 0;INT32 opCount = INS_OperandCount(ins);
+		UINT32 insReadReg = INS_MaxNumRRegs(ins);
+		UINT32 insWriteReg = INS_MaxNumWRegs(ins);
+
 		INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR)FastForward, IARG_END);
 		INS_InsertThenCall(ins, IPOINT_BEFORE, (AFUNPTR)ins_footprint, IARG_UINT32, startAddr, IARG_UINT32, endAddr, IARG_END);
 
-		UINT32 memOperands = INS_MemoryOperandCount(ins);
-		 for (UINT32 memOper = 0; memOper < memOperands; memOper++){
+		for (UINT32 memOper = 0; memOper < memOperands; memOper++){
 			UINT32 memSize = INS_MemoryOperandSize(ins, memOper);
+			
+			if (INS_OperandIsMemory(ins, memOper)) {
+			    ADDRDELTA displacement = INS_OperandMemoryDisplacement(ins, memOper);
+			    INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR)FastForward, IARG_END);
+			    INS_InsertThenPredicatedCall(ins, IPOINT_BEFORE, (AFUNPTR)disp_distribution, IARG_ADDRINT, displacement, IARG_END);
+                }
 			INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR)FastForward, IARG_END);
-                INS_InsertThenPredicatedCall(ins, IPOINT_BEFORE, (AFUNPTR)data_footprint, IARG_MEMORYOP_EA, memOper, IARG_UINT32, memSize, IARG_END);
-                totalMemSize += memSize;
+                	INS_InsertThenPredicatedCall(ins, IPOINT_BEFORE, (AFUNPTR)data_footprint, IARG_MEMORYOP_EA, memOper, IARG_UINT32, memSize, IARG_END);
 		 }
+
+		INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR)FastForward, IARG_END);
+            	INS_InsertThenCall(ins, IPOINT_BEFORE, (AFUNPTR)ins_distribution,
+				IARG_UINT32, insSize, 
+                            	IARG_UINT32, opCount, 
+                            	IARG_UINT32, insReadReg, 
+                            	IARG_UINT32, insWriteReg, 
+                            	IARG_END);
+
+		INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR)FastForward, IARG_END);
+		INS_InsertThenPredicatedCall(ins, IPOINT_BEFORE, (AFUNPTR)mem_distribution,
+                                IARG_UINT32, numRead, 
+                                IARG_UINT32, numWrite,
+                                IARG_UINT32, totalMemSize,
+                                IARG_END);
+
+		UINT32 operandCount = INS_OperandCount(ins);
+            	for (UINT32 opIdx = 0; opIdx < operandCount; opIdx++) {
+                	if (INS_OperandIsImmediate(ins, opIdx)) {
+                    		INT32 immValue = INS_OperandImmediate(ins, opIdx);
+                    		INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR)FastForward, IARG_END);
+                    		INS_InsertThenCall(ins, IPOINT_BEFORE, (AFUNPTR)imm_distribution, IARG_ADDRINT, immValue,IARG_END);
+                	}
+            	}
 	}
 	INS_InsertIfCall(ins, IPOINT_BEFORE, FastForward, IARG_END);
 	INS_InsertThenPredicatedCall(ins, IPOINT_BEFORE, MyPredicatedAnalysis, ..., IARG_END); // for instructions with true predicates
