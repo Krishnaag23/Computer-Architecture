@@ -1,0 +1,43 @@
+Part C Analysis Results: 
+------------------------------------------------------------
+Instruction Footprint Blocks            = 890
+Instruction Footprint (in bytes)        = 28480
+Data Footprint Blocks                   = 528736
+Data Footprint (in bytes)               = 16919552
+Single Memory Chunk Instruction accesses  = 958067988
+Multiple Memory Chunk Instruction accesses= 41932013
+Single Memory Chunk Data accesses         = 551105073
+Multiple Memory Chunk Data accesses       = 4470346
+============================================================
+Part D Analysis Results: 
+------------------------------------------------------------
+Distribution of instruction length Results: 
+1 : 154578809
+2 : 308551256
+3 : 382074562
+4 : 34347877
+5 : 45117271
+6 : 48822846
+7 : 26506959
+10 : 421
+
+Distribution of number of operands Results: 
+0 : 802403
+1 : 225879
+2 : 518294355
+3 : 281743917
+4 : 172763957
+5 : 25030575
+6 : 1138915
+
+Instructions with 2 register read operands  : 540431957
+Instructions with 1 register write operand  : 665542419
+Instructions with 3 memory operands         : 0
+Instructions with 1 memory read operand     : 337160174
+Instructions with 2 memory write operands   : 0
+Max bytes touched by a memory instruction   : 8
+Avg bytes touched by a memory instruction   : 4.221750
+Max immediate value                         : 2147483647
+Min immediate value                         : -2092037281
+Max displacement value                      : 136090116
+Min displacement value                      : -104
