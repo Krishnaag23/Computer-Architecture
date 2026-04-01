@@ -13,12 +13,15 @@
 #include <fstream>
 #include <iomanip>
 #include <vector>
+#include <set>
+#include <queue>
 
 using std::cerr;
 using std::endl;
 using std::string;
 using std::vector;
-
+using std::set;
+using std::queue;
 /* ================================================================== */
 // Global variables
 /* ================================================================== */
@@ -28,6 +31,9 @@ UINT64 icount = 0;
 UINT64 key = 0;
 vector <UINT64> branchTrace;
 UINT64 prevInstrAddr;
+set<UINT64> intrestingAddress;
+set<UINT64> notIntrestingAddress;
+queue <UINT64> history;
 
 std::ostream* out = &cerr;
 
@@ -52,9 +58,37 @@ INT32 Usage()
  */
 
 void checkTaken(ADDRINT ip, bool taken){
-		branchTrace.push_back(ip);
-		if (taken) branchTrace.push_back(1);
-		else branchTrace.push_back(0);
+	if( ip != history.front() ) {
+			if(intrestingAddress.count(ip) || notIntrestingAddress.count(ip)) {
+				notIntrestingAddress.insert(ip);
+				history.pop();
+				history.push(ip);
+				return;
+			}
+	}
+
+	history.pop();
+	history.push(ip);
+
+	if (history.front() == history.back()) {
+		notIntrestingAddress.insert(ip);
+		return;	
+	}
+
+	if (notIntrestingAddress.count(ip)) return;
+
+	if (!intrestingAddress.count(ip)){
+		if (!taken && notIntrestingAddress.count(history.front())) {
+			notIntrestingAddress.insert(ip); 
+			return;
+		}
+
+	}
+	
+	intrestingAddress.insert(ip);
+	branchTrace.push_back(ip);
+	if (taken) branchTrace.push_back(1);
+	else branchTrace.push_back(0);
 
 }
 
@@ -104,6 +138,9 @@ VOID Fini(INT32 code, VOID* v)
 
 int main(int argc, char* argv[])
 {
+	history.push(0);
+	history.push(0);
+
     if (PIN_Init(argc, argv)) return Usage();
 
     string fileName   = KnobOutputFile.Value();
