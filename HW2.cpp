@@ -113,12 +113,16 @@ VOID Trace(TRACE trace, VOID* v)
     for (BBL bbl = TRACE_BblHead(trace); BBL_Valid(bbl); bbl = BBL_Next(bbl))
     {
 
-        for (INS ins = BBL_InsHead(bbl); INS_Valid(ins); ins = INS_Next(ins))
-        {
-		//check conditional branches
-	if (INS_IsBranch(ins) && INS_HasFallThrough(ins)) {
-		INS_InsertCall(ins, IPOINT_BEFORE, AFUNPTR(checkTaken), IARG_INST_PTR, IARG_BRANCH_TAKEN ,IARG_END);
-	}
+        for (INS ins = BBL_InsHead(bbl); INS_Valid(ins); ins = INS_Next(ins)) {
+		if (RTN_Valid(INS_Rtn(ins))){
+			RTN rtn =  INS_Rtn(ins);
+			IMG img = SEC_Img(RTN_Sec(rtn));
+			if (IMG_Valid(img) && IMG_IsMainExecutable(img)){
+				if (INS_IsBranch(ins) && INS_HasFallThrough(ins)) {
+					INS_InsertCall(ins, IPOINT_BEFORE, AFUNPTR(checkTaken), IARG_INST_PTR, IARG_BRANCH_TAKEN ,IARG_END);
+				}
+			}
+		}
 	}
     }
 }
