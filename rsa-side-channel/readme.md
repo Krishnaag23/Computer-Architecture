@@ -1,5 +1,4 @@
-# CS422 HW2 - RSA Key Extractor
-**Group 2 | Krishna Agrawal (230574)**
+# RSA Key Extractor
 
 ---
 
@@ -7,7 +6,7 @@
 
 | File | Description |
 |---|---|
-| `HW2.cpp` | PIN tool source code |
+| `tracer.cpp` | PIN tool source code |
 | `makefile` | Build file |
 | `analyse.py` | Python script to extract key from trace |
 | `README.md` | This file |
@@ -24,8 +23,8 @@
 
 ## Compilation
 ```bash
-cd pin-4.1-99687-d9b8f822c/source/tools/HW2/
-make obj-intel64/HW2.so
+cd pin-4.1-99687-d9b8f822c/source/tools/rsa-side-channel/
+make obj-intel64/tracer.so
 ```
 
 ---
@@ -34,7 +33,7 @@ make obj-intel64/HW2.so
 
 ### Step 1: Run PIN tool to generate trace
 ```bash
-./pin (path to pin executable) -t ./source/tools/HW2/obj-intel64/HW2.so (path to shared object) -o key.out -- ./source/tools/HW2/leaky_rsa (path to leaky_rsa binary)
+./pin (path to pin executable) -t ./source/tools/rsa-side-channel/obj-intel64/tracer.so (path to shared object) -o key.out -- ./source/tools/rsa-side-channel/leaky_rsa (path to leaky_rsa binary)
 ```
 
 This generates `key.out` containing the branch trace.
@@ -48,7 +47,7 @@ This generates `key.txt` containing the extracted key in decimal.
 
 ### Step 3: Verify
 ```bash
-./source/tools/HW2/leaky_rsa -a $(cat key.txt)
+./source/tools/rsa-side-channel/leaky_rsa -a $(cat key.txt)
 # Expected output: Your Key is Correct
 ```
 
